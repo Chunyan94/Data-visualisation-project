@@ -1,0 +1,547 @@
+---
+title: "JI Chunyan"
+output:
+  html_document:
+    df_print: paged
+  pdf_document:
+    number_sections: yes
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+
+# Introduction
+
+This project, inspired by renowned statistician Hans Rosling, examines
+the change in fertility rates from 1990 to 2020 and explores variations
+in rates among countries based on the UN Human Development Index (HDI).
+The project can be accessed on my GitHub repository at
+[**https://github.com/Chunyan94/projectADD1.git**](https://github.com/Chunyan94/projectADD1.git).
+
+**Source data**
+
+1.  *United Nations Demographic Indicators*: This data contains
+    information on fertility rate changes for countries from 1950 to
+    2100. 
+2.  *United Nations Human Development Index (HDI)*: This composite index
+    measures average achievement in three dimensions of human
+    development: a long and healthy life, knowledge, and a decent
+    standard of living.
+3.  *Gross national income (GNI) per capita* : The GNI per capita is the
+    dollar value of a country's final income in a year, divided by its
+    population. It should be reflecting the average before tax income of
+    a country's citizens.
+
+# Import and Cleaning of Data
+
+## 1. UN Demographic Indicators
+
+**File name**: "1950-2100, medium (ZIP, 7.77 MB)"
+
+**Source link**:
+[**https://population.un.org/wpp/Download/Standard/CSV/**](https://population.un.org/wpp/Download/Standard/CSV/)
+
+**Variables**
+
+-   LocID: area codes in M49 classification
+
+-   ISO3_code: area codes in ISO 3166 classification
+
+-   Location: country or area names
+
+-   Time: year
+
+-   TPopulation1July: total population
+
+-   TFR: Total Fertility Rate (live births per woman)
+
+```{r, message=FALSE}
+library(readr)
+
+popu_raw <- read_csv("https://raw.githubusercontent.com/Chunyan94/projectADD1/main/data/WPP2022_Demographic_Indicators_Medium.csv",show_col_types = FALSE)
+
+```
+
+### Clean data
+
+We selected six variables from the population demographic data for this
+analysis.
+
+```{r, message=FALSE}
+library(tidyverse)
+
+popu <- popu_raw %>% 
+  select(ISO3_code, LocID, Location, Time, TPopulation1July, TFR, PopGrowthRate, LEx) %>% 
+  rename(iso3 = ISO3_code,
+         year = Time,
+         country = Location,
+         population = TPopulation1July,
+         fertilityRate = TFR) %>%
+  arrange(LocID) 
+
+head(popu, 5)
+
+```
+
+## 2. Human Development Index
+
+**File name**: HDR21-22_Composite_indices_metadata.csv
+
+**Source link**:
+<https://hdr.undp.org/data-center/documentation-and-downloads>
+
+**Variables**
+
+-   iso3: area codes in ISO 3166 classification
+
+-   country: country names
+
+-   hdicode: four human development classification
+
+    -   "low" : less than 0.550 for human development
+
+    -   "medium": 0.550--0.699 for human development
+
+    -   "high" : 0.700--0.799 for human development
+
+    -   "very high": 0.800 or greater for human development.
+
+-   region: region classfication
+
+-   hdi_1990 - hdi_2021: human development index from 1990 to 2021
+
+```{r}
+HDI_raw <- read_csv("https://raw.githubusercontent.com/Chunyan94/projectADD1/main/data/HDI.csv",show_col_types = FALSE)
+head(HDI_raw,3)
+```
+
+**Transpose data**
+
+```{r}
+
+HDI <- HDI_raw %>% 
+  # select country & hdi_990 to hdi_2020
+  select(c(1:4,6:36)) %>% 
+  # transpose hdi_1990 - hdi_2020 
+  pivot_longer(cols = starts_with("hdi_"),
+               names_to = "year",
+               names_prefix = "hdi_",
+               values_to = "hdi") %>% 
+    #  deleting empty string and NA
+  filter(!is.na(hdi) & !is.na(hdicode) & hdicode != "") %>% 
+  mutate(year = as.integer(year),
+         hdicode = factor(hdicode, levels = c('Low', 'Medium', 'High', 'Very High')),
+         hdi = as.numeric(hdi))
+
+head(HDI,5)
+
+```
+
+## Merge population and HDI data
+
+```{r}
+final <- merge(popu, HDI, by = c("iso3", "year")) %>%
+  # change the popu$country name 
+  rename(country = country.x) %>%
+  # drop extra country variable
+  select(- country.y) 
+
+head(final, 5)
+```
+
+# Data visualization
+
+## Create World Maps
+
+I used coordinates data from the 'maps' package and plotted them using
+the 'ggplot2' library's 'map_data' function to create visual
+representations of the data.
+
+```{r, warning=FALSE}
+
+# world map data 
+coordinate <- map_data("world")
+
+Year <- 2020
+
+world <- final %>%
+  merge(coordinate, by.x = "country", by.y = "region") %>%
+  arrange(group, order) %>%
+  filter(year == Year)  
+
+ggplot(data = world) +
+  geom_map(
+    aes(map_id = region, 
+        x = long, 
+        y = lat, 
+        fill=PopGrowthRate), 
+    map = world
+  ) +
+  labs(title = paste("Population growth rate in", Year)) +
+  theme_void()  
+```
+
+However, the names of regions in the map data do not align with those in
+the merged "final" dataset. Therefore, it is necessary to replace the
+mismatched region names.
+
+### 1. Identify unmatched country names
+
+Some countries does , like "United States of American". I need to
+explore why there is a difference. Identify corresponding names for
+countries in the final data set that do not match the names in the
+coordinate data set.
+
+```{r}
+# identify unmatched countries in the map_data  
+x1 <- unique(final$country)[is.na(charmatch(unique(final$country), 
+                                      unique(coordinate$region), 
+                                      nomatch = NA_integer_))]
+
+x1
+```
+
+### 2. Find correspondant country names
+
+There are currently 28 countries unmatched country names at the "final"
+data set. We need to find the correspondent names in the map data -
+"coordinate" data set.
+
+```{r, warning=FALSE}
+# find correpondent names for unmatched countries at the "final" data set 
+newx1<- c("Barbuda", "Bolivia", "Brunei", "Ivory Coast", "Republic of Congo", 
+          "Cape Verde", "Czech Republic", "Micronesia", "UK", "China", 
+          "Iran", "Nevis", "South Korea", "Laos", "Moldova", "South Korea",  
+          "Palestine", "Russia", "Swaziland", "Syria", "Trinidad", "Turkey", 
+          "Tuvalu", "Tanzania", "USA", "Saint Vincent", "Venezuela", "Vietnam")
+
+new_names <- data.frame(cbind(oldCountry=x1,
+                              newCountry= newx1))
+head(new_names,5)
+
+```
+
+### 3. Replace unmatched country names
+
+We need to utilize the **stri_replace_all_fixed** function from the
+{stringi} package to replace the mismatched country names.
+
+```{r}
+library(stringi)
+
+final2 <- final %>% 
+  mutate(newCountry = ifelse(country %in% new_names$oldCountry, 
+                            new_names$newCountry[match(country, new_names$oldCountry)], 
+                            country)) %>%   
+  mutate(newCountry = as.character(newCountry))
+
+```
+
+\# Note: This code uses the **`ifelse()`** function to check if each
+value in **`final$newCountry`** is in the **`new_names$oldCountry`**
+vector. If it is, it replaces the value with the corresponding value in
+**`new_names$newCountry`**. If it is not, it keeps the original value.
+
+## **4. Merge map data with population data**
+
+```{r, warning=FALSE}
+# Use a variable for the year to make it easier to change the year in the future
+Year <- 2020
+
+library(tidyverse)
+world <- final2 %>%
+  merge(coordinate, by.x = "newCountry", by.y = "region") %>%
+  filter(year == Year) %>%
+  arrange(group, order) 
+
+
+world_map <- ggplot(data = world) +
+geom_map(
+aes(map_id = region,
+    x = long,
+    y = lat,
+    fill = PopGrowthRate),
+    map = world) +
+  labs(title = paste("Population growth rate in", Year),
+       subtitle = paste(length(unique(world$newCountry)), "countries")) +
+  ggthemes::theme_map() + 
+  scale_fill_gradient2(name = "Poupation Growth Rate") 
+
+world_map 
+```
+
+## The change of fertility rate
+
+```{r, warning = FALSE, message=FALSE}
+
+g <- final %>% 
+   drop_na (hdicode) %>%  
+  rename(HDI = hdicode) %>% 
+  ggplot(aes(x = hdi,
+             y = fertilityRate,
+             color = HDI),
+         alpha = 0.01,
+         size = population) +
+  geom_point() +
+  geom_smooth(se = FALSE) +
+  xlim(0, 1) +
+  labs(title="Country fertility rate by human development index \n (1990-2021)",
+       x = "Human Development Index",
+       y = "Fertility Rate") 
+
+print(g)
+```
+
+```{r, warning = FALSE, message = FALSE}
+pacman::p_load(gganimate, gifski, png, av, tweenr)
+# Creating an animating graph 
+g + 
+  transition_time(as.integer(year)) +
+  labs(title = "Change of Fertility rate by Human Development Index (1990-2020) "
+       ,subtitle = "Year: {frame_time}")
+# + facet_wrap(~HDI)
+```
+
+The graph suggests that some countries have experienced a significant
+decline in fertility rate. To further investigate this trend, I plan to
+calculate the year-over-year change in fertility rate for each country.
+
+```{r}
+# calculate fertility rate difference
+Diffence <- final %>%  
+  group_by(iso3) %>%  
+  arrange(iso3, year) %>%  
+  mutate( Diff = fertilityRate - lag(fertilityRate) ) %>%  
+  select(country, iso3, year, hdi, hdicode, fertilityRate, Diff, region) 
+
+d <- Diffence %>%  
+  na.omit() %>%  
+  ggplot(aes(x = hdicode, y = Diff,color = hdicode)) +
+  geom_violin() 
+
+d
+
+d + 
+  transition_time(as.integer(year)) +
+  labs(title =  "Fertility rate change by year",
+    subtitle = "Year: {frame_time}")
+
+```
+
+I am interested in identifying which countries experienced the largest
+decline in fertility rate for each year between 1990 and 2020, and how
+this trend relates to the country's human development index ranking
+
+```{r}
+Diffence |> 
+    filter(year == 2020) %>%
+  group_by(year) %>%
+  slice_min(Diff, n = 10) %>%
+  drop_na (hdicode) %>% 
+  arrange(Diff) %>%
+  ggplot(aes(y = country, x = Diff,
+             color = hdicode,
+             size = abs(Diff))) +
+  geom_point() +
+  #  remove scale legend
+  guides(size = "none") +
+  labs(title = "Countries with biggest fertility rate drop ", 
+       subtitle = paste("Year: 2020" ),
+       x = "Fertility rate drop") 
+```
+
+# Case study
+
+**identify countries to invest for pharmaceutical companies (by market
+size and potential)**
+
+To further utilize the data, let's consider a practical scenario where
+pharmaceutical companies want to identify countries for investment
+opportunities. To do this, we can use a model that considers key factors
+such as market size and potential.
+
+In terms of market size, we can analyze population size, life
+expectancy, and fertility rate data from the United Nations, Department
+of Economic and Social Affairs, Population Division (2022). World
+Population Prospects 2022.
+
+In terms of potential, we can analyze Gross National Income (GNI) per
+capita data from the HDR21-22_Composite_indices_metadata.csv file, which
+can be found on the UNDP website. We should also transpose the GNI per
+capita data to make it more useful for our analysis.
+
+## Metadata
+
+1.  **life expectancy and annual population**
+
+**File name**: "1950-2100, medium (ZIP, 7.77 MB)"
+
+**Source link**:
+[**https://population.un.org/wpp/Download/Standard/CSV/**](https://population.un.org/wpp/Download/Standard/CSV/)
+
+-   Variables
+
+    -   *LEx*: Life Expectancy at Birth, both sexes (years)
+
+    -   *TPopulation1July*: Total Population, as of 1 July (thousands)
+
+2.  **Gross national income (GNI) per capita**
+
+    **File name**: HDR21-22_Composite_indices_metadata.csv
+
+    **Source link**:
+    <https://hdr.undp.org/data-center/documentation-and-downloads>
+
+-   Variables
+
+    -   *gnipc*: Gross national income (GNI) per capita
+
+**Transpose the Gross national income (GNI) per capita data**
+
+```{r}
+library(dplyr)
+
+GNI <- HDI_raw %>%  
+  select(c(1:2,134:165)) |>
+  pivot_longer(cols = starts_with("gnipc_"),
+               names_to = "year",
+               names_prefix = "gnipc_",
+               values_to = "gni") %>%  
+  na.omit()
+
+project <- merge(final,GNI) 
+```
+
+### Identify countries with a large market size and potential
+
+**Step 1: Population size**
+
+We can first filter out those with lower life expectancy and higher
+population growth rates. One strategy for this is to only consider
+countries with population growth rates below the median of all
+countries.
+
+![]()
+
+```{r, warning=FALSE}
+countries <-  project  %>%  
+  group_by(year, hdicode) %>%
+  filter(hdicode != "Low" & 
+           PopGrowthRate < median(PopGrowthRate) &
+           population > median(population))
+
+listCountry <- countries %>%
+  pull(country) %>%
+  unique()
+
+df <-  world %>% 
+  filter(country %in% listCountry)
+
+ggplot(df) +
+geom_map(aes(map_id = region,
+    x = long,
+    y = lat,
+    fill = PopGrowthRate),
+    map = df ) +
+  labs(title = paste("Countries with low population growth rate"),
+       subtitle = paste(length(unique(df$newCountry)), "countries")) +
+  ggthemes::theme_map() + 
+  scale_fill_gradient(name = "Poupation Growth Rate")
+```
+
+**Step 2: filter countries by the Gross national income (GNI) per capita
+data**
+
+```{r}
+countries <- countries |> 
+  group_by(year)  |> 
+  filter(gni > mean(gni)) 
+
+listCountry <- countries |> 
+  pull(country) |> 
+  unique()
+
+listCountry
+
+df <-  world %>% 
+  filter(country %in% listCountry)
+
+ggplot(df) +
+geom_map(aes(map_id = region,
+    x = long,
+    y = lat,
+    fill = PopGrowthRate),
+    map = df ) +
+  labs(title = paste("Countries with low population growth rate"),
+       subtitle = paste(length(unique(df$newCountry)), "countries")) +
+  ggthemes::theme_map() + 
+  scale_fill_gradient(name = "Poupation Growth Rate")
+
+```
+
+**Step 3: check which countries have bigger population\
+**
+
+```{r}
+if (!require("ggrepel")) install.packages("ggrepel")
+library(ggrepel)
+
+graph_project <- countries %>% 
+  filter(year %in% c(2010:2020)) %>%
+  ggplot(aes(PopGrowthRate, year, color=iso3)) +
+  scale_y_continuous(breaks = c(2010:2021)) + 
+  geom_point(aes(size = population,na.rm = TRUE)) +
+  guides(size = FALSE, color = FALSE) +
+  labs(x = "Population Growth Rate", y = "Year")
+
+# add country which have population bigger than the median on 2020 
+Year <- 2020
+
+graph_project +
+  geom_label_repel(data = countries %>% 
+                     filter(year == Year & 
+                              population > median(population)),
+                   aes(label = country),
+                  nudge_x = 0.5,
+                  label.size = 0.01,
+                  max.overlaps = getOption("ggrepel.max.overlaps", 
+                                           default = 100),
+                  na.rm = TRUE) +
+  labs(title = "Countries with population bigger than median",
+       subtitle = paste("Year : ", Year))
+
+
+```
+
+# Conclusion
+
+This project identifies 24 countries that might need health care
+services or medical cares for the elderly people considering the bigger
+life expectancy, low population growth rate and greater gross national
+income per capital.
+
+```{r}
+countries %>%
+  pull(country) %>%
+  unique()
+```
+
+# Limitations
+
+Despite having a list of potential countries in need of medical services
+for the elderly, this project does not accurately identify the specific
+countries to invest in based on life expectancy, population growth rate,
+and gross national income per capita. To enhance the applicability of
+the conclusion, I need to develop or utilize a model for more precise
+analysis.
+
+## Reference:
+
+-   UN Human Development Index:
+    <https://hdr.undp.org/data-center/human-development-index#/indicies/HDI>
+
+-   Details on how the HDI is calculated
+    <http://hdr.undp.org/sites/default/files/hdr2022_technical_notes.pdf>
+
+-   Gapminder foundation:
+    <https://www.gapminder.org/tools/#$chart-type=bubbles&url=v1>
