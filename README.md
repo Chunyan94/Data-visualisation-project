@@ -1,6 +1,13 @@
 # project - demographic and economic data visualization and analysis 
 
-This project, inspired by renowned statistician Hans Rosling, examines the change in fertility rates from 1990 to 2020 and explores variations in rates among countries based on the UN Human Development Index (HDI).
+Analyzed global fertility rates from 1990 to 2020 using Python and R, focusing on variations linked to the UN Human Development Index. Key aspects of this project included:
+
+•	Statistical Analysis: Applied regression analysis and time series forecasting to examine trends and assess correlations between fertility rates and HDI indicators.
+•	Data Visualization: Created dynamic visualizations to present complex data, making demographic trends accessible and understandable.
+•	Project Limitations: Identified countries needing elderly care services based on life expectancy and economic factors but recognized the model’s limitations in specifying optimal investment targets.
+•	Future Model Development: Planned to enhance accuracy with machine learning techniques, aiming to refine investment recommendations for healthcare services.
+![image](https://github.com/Chunyan94/Data-visualisation-project/assets/75027273/504d57ac-728e-423e-bbb1-4aa77bb49be8)
+
 
 Source data
 
