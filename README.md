@@ -6,7 +6,6 @@ Analyzed global fertility rates from 1990 to 2020 using Python and R, focusing o
 •	Data Visualization: Created dynamic visualizations to present complex data, making demographic trends accessible and understandable.
 •	Project Limitations: Identified countries needing elderly care services based on life expectancy and economic factors but recognized the model’s limitations in specifying optimal investment targets.
 •	Future Model Development: Planned to enhance accuracy with machine learning techniques, aiming to refine investment recommendations for healthcare services.
-![image](https://github.com/Chunyan94/Data-visualisation-project/assets/75027273/504d57ac-728e-423e-bbb1-4aa77bb49be8)
 
 
 Source data
