@@ -2,10 +2,10 @@
 
 Analyzed global fertility rates from 1990 to 2020 using Python and R, focusing on variations linked to the UN Human Development Index. Key aspects of this project included:
 
-•	Statistical Analysis: Applied regression analysis and time series forecasting to examine trends and assess correlations between fertility rates and HDI indicators.
-•	Data Visualization: Created dynamic visualizations to present complex data, making demographic trends accessible and understandable.
-•	Project Limitations: Identified countries needing elderly care services based on life expectancy and economic factors but recognized the model’s limitations in specifying optimal investment targets.
-•	Future Model Development: Planned to enhance accuracy with machine learning techniques, aiming to refine investment recommendations for healthcare services.
+- Statistical Analysis: Applied regression analysis and time series forecasting to examine trends and assess correlations between fertility rates and HDI indicators.
+- Data Visualization: Created dynamic visualizations to present complex data, making demographic trends accessible and understandable.
+- Project Limitations: Identified countries needing elderly care services based on life expectancy and economic factors but recognized the model’s limitations in specifying optimal investment targets.
+- Future Model Development: Planned to enhance accuracy with machine learning techniques, aiming to refine investment recommendations for healthcare services.
 
 
 Source data
